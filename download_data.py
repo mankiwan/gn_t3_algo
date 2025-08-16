@@ -8,7 +8,16 @@ import json
 api = GlassnodeAPI()
 
 # EDIT THESE PARAMETERS AS NEEDED
-endpoint = "addresses/holder_retention"  # Change this to your desired metric
+# endpoint = "addresses/holder_retention"  
+
+# Generate filename with asset symbol and time interval
+# filename = f"{endpoint.replace('/', '_')}_{params['a']}_{params['i']}"
+
+# Change this to your desired metric
+bulk_endpoints = [
+    "addresses/holder_retention",
+    "addresses/holder_retention",
+]
 params = {
     'a': 'BTC',                 # Asset symbol (BTC, ETH, etc.)
     's': '2020-01-01',          # Start date (YYYY-MM-DD)
@@ -16,9 +25,6 @@ params = {
     'i': '24h',                  # Time interval (1h, 24h, 1w, 1month)
     'f': 'csv'                 # Output format: csv, json
 }
-
-# Generate filename with asset symbol and time interval
-filename = f"{endpoint.replace('/', '_')}_{params['a']}_{params['i']}"
 
 def date_to_timestamp(date_str):
     """Convert YYYY-MM-DD date string to unix timestamp"""
@@ -72,9 +78,7 @@ def save_data(data, filename, output_format='json'):
     except Exception as e:
         print(f"Error saving data: {e}")
 
-if __name__ == "__main__":
-    print(f"Fetching data from: {endpoint}")
-    
+def fetch_all_endpoints_data():
     # Convert date strings to unix timestamps for 's' and 'u' params
     api_params = params.copy()
     if 's' in api_params:
@@ -82,10 +86,27 @@ if __name__ == "__main__":
     if 'u' in api_params:
         api_params['u'] = date_to_timestamp(api_params['u'])
     
-    print(f"API Parameters with timestamps: {api_params}")
+    failed_endpoints = []
     
-    # Fetch data
-    data = api.fetch_data(endpoint, **api_params)
+    for endpoint_path in bulk_endpoints:
+        try:
+            print(f"Fetching: {endpoint_path}")
+            data = api.fetch_data(endpoint_path, **api_params)
+            if data:
+                endpoint_filename = f"{endpoint_path.replace('/', '_')}_{params['a']}_{params['i']}"
+                save_data(data, endpoint_filename, params['f'])
+            else:
+                failed_endpoints.append(endpoint_path)
+        except Exception as e:
+            print(f"Failed {endpoint_path}: {e}")
+            failed_endpoints.append(endpoint_path)
+        
+        # Add delay between API calls to avoid rate limiting
+        time.sleep(1)
     
-    # Save data
-    save_data(data, filename, params['f'])
+    if failed_endpoints:
+        print(f"\nFailed endpoints: {failed_endpoints}")
+
+if __name__ == "__main__":
+    """Fetch data from all breakdown endpoints"""
+    fetch_all_endpoints_data()
